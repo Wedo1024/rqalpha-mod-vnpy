@@ -18,6 +18,7 @@ from rqalpha.utils.logger import system_log
 
 from ..interface import AbstractQuotationProxy, TickDict, QuotationDict
 from ..data_cache import DataCache
+from ..vnpy import MdApi
 
 
 class CTPTickDict(TickDict):
@@ -185,12 +186,12 @@ class CtpMdApi(MdApi):
             self.reqUserLogin(req, self.req_id)
         return self.req_id
 
-    def close(self):
+    def stop(self):
         """关闭"""
         self.exit()
 
 
-class CTPQuotationProxy(AbstractQuotation):
+class CtpQuotationProxy(AbstractQuotation):
     def __init__(self, gateway, mod_config):
         super(CTPQuotation, self).__init__(gateway, mod_config)
         self.md_api = CtpMdApi(self, mod_config.temp_path, mod_config.CTP.userID, mod_config.CTP.password,
@@ -212,7 +213,7 @@ class CTPQuotationProxy(AbstractQuotation):
             self.md_api.subscribe(order_book_id)
 
     def stop(self):
-        self.md_api.close()
+        self.md_api.stop()
 
     def update_universe(self, universe):
         self._subscribed = universe
@@ -226,8 +227,10 @@ class CTPQuotationProxy(AbstractQuotation):
     def get_last_quotation(self, order_book_id):
         return self._quotation_cache.get(order_book_id)
 
-    def on_log(self, log):
+    @staticmethod
+    def on_log(log):
         system_log.info(log)
 
-    def on_err(self, error):
+    @staticmethod
+    def on_err(error):
         system_log.error('CTP 错误，错误代码：%s，错误信息：%s' % (str(error['ErrorID']), error['ErrorMsg'].decode('GBK')))
