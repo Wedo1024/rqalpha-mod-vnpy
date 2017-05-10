@@ -123,6 +123,10 @@ class CtpGateway(object):
             return
         self.on_debug('订单回报: %s' % str(order_dict))
         if self._data_update_date != date.today():
+            order = self._cache.get_cached_order(order_dict)
+            if order_dict.status == ORDER_STATUS.ACTIVE:
+                if order not in self.open_orders:
+                    self.open_orders.append(order)
             return
 
         order = self._cache.get_cached_order(order_dict)
@@ -168,6 +172,7 @@ class CtpGateway(object):
                     self.open_orders.remove(order)
 
     def on_trade(self, trade_dict):
+        self.on_debug('交易回报: %s' % str(trade_dict))
         if self._data_update_date != date.today():
             self._cache.cache_trade(trade_dict)
         else:
