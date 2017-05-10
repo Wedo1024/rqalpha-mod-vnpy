@@ -37,6 +37,7 @@ class VNPYMod(AbstractMod):
 
         from .ctp.gateway import CtpGateway
         from .ctp.data_cache import DataCache
+        from .ctp.ctp_quotation import CtpQuotationProxy
         self._env = env
         data_cache = DataCache()
         self._gateway = CtpGateway(env, data_cache,
@@ -44,7 +45,8 @@ class VNPYMod(AbstractMod):
                                    mod_config.CTP.brokerID)
         self._gateway.init_td_api(mod_config.CTP.tdAddress)
         if mod_config.default_data_source:
-            self._gateway.init_md_api(mod_config.CTP.mdAddress)
+            quotation_proxy = CtpQuotationProxy(self._gateway, mod_config)
+            self._gateway.set_quotation_proxy(quotation_proxy)
         self._gateway.connect_and_sync_data()
         self._env.set_broker(VNPYBroker(self._gateway))
         self._env.set_event_source(VNPYEventSource(env, mod_config, self._gateway))

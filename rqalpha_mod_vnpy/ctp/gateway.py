@@ -27,7 +27,7 @@ from rqalpha.model.order import Order
 from rqalpha.model.trade import Trade
 from rqalpha.model.portfolio import Portfolio
 
-from .api import CtpTdApi, CtpMdApi
+from .api import CtpTdApi
 from ..utils import cal_commission
 
 
@@ -36,7 +36,8 @@ class CtpGateway(object):
         self._env = env
 
         self.td_api = None
-        self.md_api = None
+
+        self.quotation_proxy = None
 
         self.temp_path = temp_path
         self.user_id = user_id
@@ -50,7 +51,6 @@ class CtpGateway(object):
         self._tick_que = Queue()
         self._cache = data_cache
 
-        self.subscribed = []
         self.open_orders = []
         self.order_objects = {}
 
@@ -68,14 +68,11 @@ class CtpGateway(object):
             self._data_update_date = date.today()
             self._qry_commission()
 
-        self._subscribe_all()
         self.on_log('数据同步完成。')
 
-        self._env.event_bus.add_listener(EVENT.POST_UNIVERSE_CHANGED, self.on_universe_changed)
+        self.quotation_proxy.start()
 
-    def init_md_api(self, md_address):
-        self.md_api = CtpMdApi(self, self.temp_path, self.user_id, self.password, self.broker_id, md_address)
-        self._query_returns[self.md_api.api_name] = {}
+        self._env.event_bus.add_listener(EVENT.POST_UNIVERSE_CHANGED, self.quotation_proxy.update_universe)
 
     def init_td_api(self, td_address, auth_code=None, user_production_info=None):
         self.td_api = CtpTdApi(self, self.temp_path, self.user_id, self.password, self.broker_id, td_address, auth_code, user_production_info)
@@ -107,10 +104,7 @@ class CtpGateway(object):
 
     def exit(self):
         self.td_api.close()
-        self.md_api.close()
-
-    def on_universe_changed(self, event):
-        self.subscribed = event.universe
+        self.quotation_proxy.stop()
 
     def on_query(self, api_name, n, result):
         self._query_returns[api_name][n] = result
@@ -198,21 +192,9 @@ class CtpGateway(object):
             self._env.event_bus.publish_event(RqEvent(EVENT.TRADE, account=account, trade=trade))
 
     def on_tick(self, tick_dict):
-        if tick_dict.order_book_id in self.subscribed:
-            self._tick_que.put(tick_dict)
-        self._cache.cache_snapshot(tick_dict)
+        self._tick_que.put(tick_dict)
 
     def _connect(self):
-        if self.md_api:
-            for i in range(self._retry_times):
-                self.md_api.connect()
-                sleep(self._retry_interval * (i+1))
-                if self.md_api.logged_in:
-                    self.on_log('CTP 行情服务器登录成功')
-                    break
-            else:
-                raise RuntimeError('CTP 行情服务器连接或登录超时')
-
         if self.td_api:
             for i in range(self._retry_times):
                 self.td_api.connect()
@@ -246,7 +228,6 @@ class CtpGateway(object):
                 del self._query_returns[self.td_api.api_name][req_id]
                 self.on_debug('持仓数据返回: %s。' % str(positions.keys()))
                 return positions
-
         # 持仓数据有可能不返回
 
     def __qry_account(self):
@@ -282,11 +263,6 @@ class CtpGateway(object):
                 return order_dict
         # order 数据有可能不返回
 
-    def __subscribe(self, order_book_id):
-        if not self.md_api:
-            raise NotImplementedError
-        self.md_api.subscribe(order_book_id)
-
     def _qry_instrument(self):
         ins_cache = self.__qry_instrumnent()
         self._cache.cache_ins(ins_cache)
@@ -311,6 +287,5 @@ class CtpGateway(object):
             self._cache.cache_commission(ins_dict.underlying_symbol, commission_dict)
         self.on_debug('费率数据返回')
 
-    def _subscribe_all(self):
-        for order_book_id in self._cache.ins.keys():
-            self.__subscribe(order_book_id)
+    def set_quotation_proxy(self, quotation_proxy):
+        self.quotation_proxy = quotation_proxy
