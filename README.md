@@ -55,8 +55,8 @@ rqalpha mod uninstall vnpy
     "vn_trader_path": None,
     # 您使用 simnow 模拟交易时可以选择使用24小时服务器，该服务器允许您在收盘时间测试相关 API，如果您需要全天候测试，您需要开启此项。
     "all_day": True,
-    # 向 CTP 发送请求对时间间隔，设置过小会导致请求被吞掉
-    "query_interval": 2,
+    # VN.PY 创建临时文件的目录
+    "temp_path": "./vnpy_temp",
     # 以下是您的 CTP 账户信息，由于您需要将密码明文写在配置文件中，您需要注意保护个人隐私。
     "CTP": {
         "userID": "",
@@ -91,16 +91,10 @@ python rqalpha_vnpy_test.py
 ```
 
 
-
-
 ## FAQ
 * 为什么策略在初始化期间停滞了几十秒甚至数分钟？   
 
 	*程序在启动前，需要从 CTP 获取 Instrument 和 Commission 等数据，由于下边问题的原因，像 CTP 发送大量请求会占用很长时间。您可以将 log_level 设置成 verbose 来查看详细的回调函数执行情况。未来可能会考虑开放设置是否全量更新 commission 信息以换取更快的启动速度。*
-
-* 为什么在启动之初程序会报出一堆 ImportError？
-    
-    *这是由于新版本的 VN.PY 在启动之初会进行接口完整性的自检，若您只编译了 CTP 接口就会导致 VN.PY 抛出异常，一般情况下这并不会影响程序的运行。
 
 * 为什么我在RQAlpha中查询到的账户、持仓信息与我通过快期、vn.trader 等终端查询到的不一致？
 
@@ -115,8 +109,10 @@ python rqalpha_vnpy_test.py
     请尝试将配置文件中的 frequency 设置为 tick。
 
 
-## TODO
+## History
 
-* rqalpha-mod-vnpy 的结构和数据流程图
-* 包含 VN.PY 或 vn.trader 的一键部署包
-* 接入其他接口
+* 0.9.30
+    * 脱离对 vn.py 上层代码的依赖，直接对接 TdApi 和 MdApi 类。
+    * 启动时不再因为 vn.py 接口不完整报错。
+    * 修复断线重连及账户恢复时的若干 bug。
+    * 提升运行效率
