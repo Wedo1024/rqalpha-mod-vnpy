@@ -212,7 +212,7 @@ class AbstractTradingProxy(object):
         返回指定合约的 InsDcit 对象，若 order_book_id 为 None，则返回所有合约的对象字典。
         :return: ins_dict or dict of ins_dict
         """
-        raise NotimplementedError
+        raise NotImplementedError
 
     @abc.abstractmethod
     def get_portfolio(self):
